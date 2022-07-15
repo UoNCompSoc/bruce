@@ -4,6 +4,7 @@ use std::sync::Arc;
 use reqwest::cookie::{CookieStore, Jar};
 use reqwest::{Client, StatusCode, Url};
 use rusqlite::{params, Connection};
+use scraper::Selector;
 
 use crate::membership::Membership;
 
@@ -19,10 +20,9 @@ struct Config {
 async fn main() {
     dotenv::dotenv().expect("load .env");
     if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "bruce=info");
+        std::env::set_var("RUST_LOG", "scraper=info");
     }
     env_logger::init();
-
     let config = Config {
         members_url: std::env::var("MEMBERS_URL")
             .expect("MEMBERS_URL")
@@ -60,7 +60,7 @@ async fn main() {
         let student_ids: HashSet<u32> = memberships.iter().map(|m| m.student_id).collect();
         if !student_ids.contains(&membership.student_id) {
             if membership.discord_id.is_none() {
-                membership.drop(&conn);
+                membership.delete(&conn);
             } else {
                 membership.update_should_drop(&conn, true);
             }
@@ -88,11 +88,31 @@ async fn scrape_memberships(
         return vec![];
     }
 
-    // log::info!("Scraped {} members", members.len());
+    let html = response.text().await.unwrap();
+    if html.contains("Sorry you're not authenticated") {
+        log::error!("Failed to scrape members, invalid cookie");
+        return vec![];
+    }
+    let html = scraper::Html::parse_document(&html);
+    let sel_tr = Selector::parse("#group-member-list-datatable > tbody > tr").unwrap();
+    let sel_td = Selector::parse("td").unwrap();
+    let mut memberships = vec![];
+    for tr in html.select(&sel_tr).map(|e| e.select(&sel_td)) {
+        let data: Vec<&str> = tr.take(2).map(|td| td.text().next().unwrap()).collect();
+        memberships.push(Membership {
+            student_id: data[0].parse().unwrap(),
+            name: data[1].to_string(),
+            discord_id: None,
+            should_drop: false,
+        });
+    }
+
+    log::info!("Scraped {} members", memberships.len());
     let cookie = read_cookie_store(config, cookie_jar);
-    log::info!("Latest cookie: {}", cookie);
+    log::info!("Saving cookie: {}", cookie);
     set_saved_cookie(conn, cookie.as_str());
-    vec![]
+
+    memberships
 }
 
 fn read_cookie_store(config: &Config, cookie_jar: &Jar) -> String {
@@ -115,45 +135,13 @@ fn write_cookie_store(config: &Config, cookie_jar: &Jar, cookie_value: &str) {
 }
 
 fn get_saved_cookie(conn: &Connection) -> Option<String> {
-    let mut stmt = conn.prepare("SELECT value, timestamp FROM cookie").unwrap();
-    stmt.query_row(params![], |r| Ok(r.get(1).unwrap())).ok()
+    let mut stmt = conn.prepare("SELECT value FROM cookie").unwrap();
+    stmt.query_row(params![], |r| Ok(r.get(0).unwrap())).ok()
 }
 
 fn set_saved_cookie(conn: &Connection, cookie: &str) {
-    conn.execute(
-        "UPDATE cookie SET value = ?1, timestamp = ?2",
-        params![cookie],
-    )
-    .unwrap();
+    conn.execute("DELETE FROM cookie", params![])
+        .unwrap();
+    conn.execute("INSERT INTO cookie (value) VALUES (?1)", params![cookie])
+        .unwrap();
 }
-
-// protected List<Member> ScrapeHtml(StreamReader s)
-// {
-// var src = s.ReadToEnd();
-// var html = HDocument.Parse(src);
-//
-// var rs = html.CssSelect("#group-member-list-datatable > tbody > tr");
-// var ds = rs.Select(r => r.Children.Select(vs => vs.InnerText));
-//
-// var ms = new List<Member>();
-//
-// foreach (var r in ds)
-// {
-// var x = r.ToList();
-//
-// if (x.Count != 11)
-// {
-// foreach (var z in x)
-// {
-// Console.WriteLine(z.Trim());
-// }
-// Console.WriteLine();
-// continue;
-// }
-//
-// var m = new Member(Convert.ToUInt32(x[1].Trim()), x[3].Trim(), x[5].Trim(), x[9].Trim());
-// ms.Add(m);
-// }
-//
-// return ms;
-// }

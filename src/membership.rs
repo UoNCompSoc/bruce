@@ -79,13 +79,13 @@ impl Membership {
 
     pub fn insert(&self, conn: &Connection) {
         conn.execute(
-            "INSERT OR IGNORE INTO memberships (student_id, student_name, should_drop) VALUES (?1, ?2, 0)",
+            "INSERT OR IGNORE INTO memberships (student_id, name, should_drop) VALUES (?1, ?2, 0)",
             params![self.student_id, self.name],
         )
         .unwrap();
     }
 
-    pub fn drop(self, conn:&Connection) {
+    pub fn delete(self, conn:&Connection) {
         conn.execute("DELETE FROM memberships WHERE student_id = ?1", params![self.student_id]).unwrap();
     }
 }
