@@ -118,16 +118,17 @@ dependencies = [
 name = "bruce"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "config",
  "dotenv",
  "env_logger",
+ "fallible-iterator",
  "log",
  "poise",
  "reqwest",
  "rusqlite",
  "scraper",
  "tokio",
+ "tokio_schedule",
 ]
 
 [[package]]
@@ -1634,7 +1635,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85127183a999f7db96d1a976a309eebbfb6ea3b0b400ddd8340190129de6eb7a"
 dependencies = [
  "bitflags",
- "chrono",
  "fallible-iterator",
  "fallible-streaming-iterator",
  "hashlink",
@@ -2147,6 +2147,16 @@ dependencies = [
  "pin-project-lite",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "tokio_schedule"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b91f371e5032da918342685fde2ca040710d38aaec985378e121055fbf031e9"
+dependencies = [
+ "chrono",
+ "tokio",
 ]
 
 [[package]]

@@ -20,6 +20,9 @@ struct Data {
 #[tokio::main]
 async fn main() {
     dotenv::dotenv().expect("failed to load .env");
+    if std::env::var("RUST_LOG").is_err() {
+        std::env::set_var("RUST_LOG", "bruce=info");
+    }
     env_logger::init();
 
     let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
@@ -44,7 +47,7 @@ async fn main() {
     };
 
     let conn = Connection::open(sqlite_file).unwrap();
-    conn.execute("CREATE TABLE IF NOT EXISTS members (student_id INT NOT NULL PRIMARY KEY, name VARCHAR NOT NULL, discord_id BIGINT)", params![]).unwrap();
+    Membership::init_table(&conn);
 
     let framework = poise::Framework::build()
         .options(poise::FrameworkOptions {
@@ -132,7 +135,7 @@ async fn register(
         }
     }
 
-    membership.update(&conn, Some(*target_member.user.id.as_u64()));
+    membership.update_disord_id(&conn, Some(*target_member.user.id.as_u64()));
 
     target_member
         .add_role(
@@ -171,7 +174,7 @@ async fn unregister(
         .remove_role(&ctx.data().http, get_member_role(ctx))
         .await?;
     if let Some(mut m) = Membership::get_by_discord_id(&conn, *target_member.user.id.as_u64()) {
-        m.update(&conn, None)
+        m.update_disord_id(&conn, None)
     }
     ctx.say("User unregistered").await?;
     Ok(())
