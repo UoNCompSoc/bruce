@@ -1,7 +1,8 @@
-use crate::membership::Membership;
 use poise::serenity_prelude::{Http, Member, RoleId};
 use poise::{serenity_prelude as serenity, PrefixFrameworkOptions};
-use rusqlite::{params, Connection};
+use rusqlite::Connection;
+
+use crate::membership::Membership;
 
 mod membership;
 
@@ -78,7 +79,9 @@ async fn setup_commands(ctx: Context<'_>) -> Result<(), Error> {
 #[poise::command(slash_command, guild_only)]
 async fn register(
     ctx: Context<'_>,
-    #[description = "Student ID"] #[max = 99999999] student_id: u32,
+    #[description = "Student ID"]
+    #[max = 99999999]
+    student_id: u32,
     #[description = "Discord member to perform registration on, or if empty, yourself"]
     target_member: Option<Member>,
 ) -> Result<(), Error> {
@@ -138,10 +141,7 @@ async fn register(
     membership.update_disord_id(&conn, Some(*target_member.user.id.as_u64()));
 
     target_member
-        .add_role(
-            &data.http,
-            get_member_role(ctx),
-        )
+        .add_role(&data.http, get_member_role(ctx))
         .await?;
 
     let result = target_member
@@ -164,9 +164,9 @@ async fn unregister(
     #[description = "The discord member to unregister"] mut target_member: Member,
 ) -> Result<(), Error> {
     let author_member = ctx.author_member().await.unwrap();
-    if !author_member.roles.contains(&get_privileged_role(ctx))
-    {
-        ctx.say("Only privileged users can run this command").await?;
+    if !author_member.roles.contains(&get_privileged_role(ctx)) {
+        ctx.say("Only privileged users can run this command")
+            .await?;
         return Ok(());
     }
     let conn = Connection::open(&ctx.data().sqlite_file).expect("open sqlite db");

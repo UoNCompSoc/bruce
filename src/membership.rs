@@ -28,6 +28,7 @@ impl Membership {
         })
         .ok()
     }
+
     pub fn get_by_discord_id(conn: &Connection, discord_id: u64) -> Option<Self> {
         let mut stmt = conn
             .prepare("SELECT student_id, name, should_drop FROM memberships WHERE discord_id = ?1")
