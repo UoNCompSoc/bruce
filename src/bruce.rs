@@ -1,4 +1,4 @@
-use poise::serenity_prelude::{Http, Member, RoleId};
+use poise::serenity_prelude::{Http, Member, RoleId, UserId};
 use poise::{serenity_prelude as serenity, PrefixFrameworkOptions};
 use rusqlite::Connection;
 
@@ -52,7 +52,7 @@ async fn main() {
 
     let framework = poise::Framework::build()
         .options(poise::FrameworkOptions {
-            commands: vec![setup_commands(), register(), unregister()],
+            commands: vec![setup_commands(), register(), unregister(), prune()],
             prefix_options: PrefixFrameworkOptions {
                 prefix: Some("bruce!".to_string()),
                 ..Default::default()
@@ -154,7 +154,6 @@ async fn register(
         ))
         .await?;
     }
-
     Ok(())
 }
 
@@ -177,6 +176,29 @@ async fn unregister(
         m.update_disord_id(&conn, None)
     }
     ctx.say("User unregistered").await?;
+    Ok(())
+}
+
+#[poise::command(slash_command, guild_only)]
+async fn prune(ctx: Context<'_>) -> Result<(), Error> {
+    let author_member = ctx.author_member().await.unwrap();
+    log::info!("Prune called by {}", author_member.display_name());
+    if !author_member.roles.contains(&get_privileged_role(ctx)) {
+        ctx.say("Only privileged users can run this command")
+            .await?;
+        return Ok(());
+    }
+    let conn = Connection::open(&ctx.data().sqlite_file).expect("open sqlite db");
+    let  memberships: Vec<Membership> = Membership::get_all(&conn).into_iter().filter(|m| m.should_drop).collect();
+    ctx.say(format!("Dropping {} members", memberships.len())).await?;
+    for membership in memberships {
+        if let Some(discord_id) = membership.discord_id {
+            let mut member = ctx.guild().unwrap().member(&ctx.data().http, UserId::from(discord_id)).await.unwrap();
+            member.remove_role(&ctx.data().http, get_member_role(ctx)).await?;
+            log::info!("Removing roles from {}", membership.student_id);
+        }
+        membership.delete(&conn);
+    }
     Ok(())
 }
 
