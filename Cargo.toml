@@ -5,11 +5,6 @@ edition = "2021"
 
 [[bin]]
 name = "bruce"
-path = "src/bruce.rs"
-
-[[bin]]
-name = "scraper"
-path = "src/scraper.rs"
 
 [dependencies]
 dotenv = "0.15"

@@ -1,55 +1,17 @@
-use poise::serenity_prelude::{Http, Member, RoleId, UserId};
+use poise::serenity_prelude::{Member, RoleId, UserId};
 use poise::{serenity_prelude as serenity, PrefixFrameworkOptions};
 use rusqlite::Connection;
 
+use crate::config::Config;
 use crate::membership::Membership;
 
-mod membership;
-
 type Error = Box<dyn std::error::Error + Send + Sync>;
-type Context<'a> = poise::Context<'a, Data, Error>;
+type Context<'a> = poise::Context<'a, Config, Error>;
 
-struct Data {
-    member_role_name: String,
-    privileged_role_name: String,
-    student_id_length: usize,
-    membership_purchase_url: Option<String>,
-    sqlite_file: String,
-    http: Http,
-}
-
-#[tokio::main]
-async fn main() {
-    dotenv::dotenv().expect("failed to load .env");
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "bruce=info");
-    }
-    env_logger::init();
-
-    let token = std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN");
-    let member_role_name =
-        std::env::var("MEMBER_ROLE_NAME").unwrap_or_else(|_| "Member".to_string());
-    let privileged_role_name =
-        std::env::var("PRIVILEGED_ROLE_NAME").unwrap_or_else(|_| "Committee".to_string());
-    let student_id_length = std::env::var("STUDENT_ID_LENGTH")
-        .unwrap_or_else(|_| 8.to_string())
-        .parse()
-        .expect("Failed to parse STUDENT_ID_LENGTH as number");
-    let membership_purchase_url = std::env::var("MEMBERSHIP_PURCHASE_URL").ok();
-    let sqlite_file = std::env::var("SQLITE_FILE").unwrap_or_else(|_| "db.sqlite".to_string());
-
-    let user_data = Data {
-        member_role_name,
-        privileged_role_name,
-        student_id_length,
-        sqlite_file: sqlite_file.clone(),
-        membership_purchase_url,
-        http: Http::new(token.as_str()),
-    };
-
-    let conn = Connection::open(sqlite_file).unwrap();
+pub(crate) async fn run(config: Config) {
+    log::info!("Bot starting");
+    let conn = Connection::open(&config.sqlite_file).unwrap();
     Membership::init_table(&conn);
-
     let framework = poise::Framework::build()
         .options(poise::FrameworkOptions {
             commands: vec![setup_commands(), register(), unregister(), prune()],
@@ -59,13 +21,13 @@ async fn main() {
             },
             ..Default::default()
         })
-        .token(token)
+        .token(&config.discord_token)
         .intents(
             serenity::GatewayIntents::non_privileged()
                 | serenity::GatewayIntents::GUILD_MEMBERS
                 | serenity::GatewayIntents::MESSAGE_CONTENT,
         )
-        .user_data_setup(move |_ctx, _ready, _framework| Box::pin(async move { Ok(user_data) }));
+        .user_data_setup(|_ctx, _ready, _framework| Box::pin(async { Ok(config) }));
 
     framework.run().await.unwrap();
 }
@@ -141,11 +103,13 @@ async fn register(
     membership.update_disord_id(&conn, Some(*target_member.user.id.as_u64()));
 
     target_member
-        .add_role(&data.http, get_member_role(ctx))
+        .add_role(ctx.data().get_http(), get_member_role(ctx))
         .await?;
 
     let result = target_member
-        .edit(&data.http, |edit| edit.nickname(&membership.name))
+        .edit(ctx.data().get_http(), |edit| {
+            edit.nickname(&membership.name)
+        })
         .await;
     if result.is_err() {
         ctx.say(format!(
@@ -170,7 +134,7 @@ async fn unregister(
     }
     let conn = Connection::open(&ctx.data().sqlite_file).expect("open sqlite db");
     target_member
-        .remove_role(&ctx.data().http, get_member_role(ctx))
+        .remove_role(ctx.data().get_http(), get_member_role(ctx))
         .await?;
     if let Some(mut m) = Membership::get_by_discord_id(&conn, *target_member.user.id.as_u64()) {
         m.update_disord_id(&conn, None)
@@ -189,12 +153,23 @@ async fn prune(ctx: Context<'_>) -> Result<(), Error> {
         return Ok(());
     }
     let conn = Connection::open(&ctx.data().sqlite_file).expect("open sqlite db");
-    let  memberships: Vec<Membership> = Membership::get_all(&conn).into_iter().filter(|m| m.should_drop).collect();
-    ctx.say(format!("Dropping {} members", memberships.len())).await?;
+    let memberships: Vec<Membership> = Membership::get_all(&conn)
+        .into_iter()
+        .filter(|m| m.should_drop)
+        .collect();
+    ctx.say(format!("Dropping {} members", memberships.len()))
+        .await?;
     for membership in memberships {
         if let Some(discord_id) = membership.discord_id {
-            let mut member = ctx.guild().unwrap().member(&ctx.data().http, UserId::from(discord_id)).await.unwrap();
-            member.remove_role(&ctx.data().http, get_member_role(ctx)).await?;
+            let mut member = ctx
+                .guild()
+                .unwrap()
+                .member(ctx.data().get_http(), UserId::from(discord_id))
+                .await
+                .unwrap();
+            member
+                .remove_role(ctx.data().get_http(), get_member_role(ctx))
+                .await?;
             log::info!("Removing roles from {}", membership.student_id);
         }
         membership.delete(&conn);

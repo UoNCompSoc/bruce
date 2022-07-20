@@ -2,47 +2,16 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::cookie_database::CookieDatabase;
-use reqwest::header::HeaderValue;
 use reqwest::{Client, StatusCode, Url};
 use rusqlite::Connection;
 use scraper::Selector;
 use tokio_schedule::Job;
+use crate::config::Config;
 
 use crate::membership::Membership;
 
-mod cookie_database;
-mod membership;
-
-#[derive(Clone)]
-struct Config {
-    members_url: Url,
-    sqlite_file: String,
-    initial_cookie_value: String,
-}
-
-impl Config {
-    fn generate() -> Self {
-        Self {
-            members_url: std::env::var("MEMBERS_URL")
-                .expect("MEMBERS_URL")
-                .parse::<Url>()
-                .expect("valid MEMBERS_URL"),
-            sqlite_file: std::env::var("SQLITE_FILE").unwrap_or_else(|_| "db.sqlite".to_string()),
-            initial_cookie_value: std::env::var("INITIAL_SUMS_COOKIE_VALUE")
-                .expect("INITIAL_SUMS_COOKIE_VALUE"),
-        }
-    }
-}
-
-#[tokio::main]
-async fn main() {
-    dotenv::dotenv().expect("load .env");
-    if std::env::var("RUST_LOG").is_err() {
-        std::env::set_var("RUST_LOG", "scraper=info");
-    }
-    env_logger::init();
-    let config = Config::generate();
-
+pub(crate) async fn run(config: Config) {
+    log::info!("Scraper starting");
     let conn = Connection::open(&config.sqlite_file).expect("failed to open sqlite connection");
     Membership::init_table(&conn);
 
@@ -69,12 +38,12 @@ async fn main() {
     if memberships.is_none() {
         panic!("Failed to scrape members with known cookies, try obtaining another one")
     }
-    run().await;
-    let schedule = tokio_schedule::every(2).hours().perform(run);
+    local_run().await;
+    let schedule = tokio_schedule::every(2).hours().perform(local_run);
     tokio::spawn(schedule).await.expect("keep running");
 }
 
-async fn run() {
+async fn local_run() {
     let config = Config::generate();
     let cookie_jar = Arc::new(CookieDatabase::new(&config.sqlite_file));
     let client = Client::builder()
@@ -113,7 +82,7 @@ async fn scrape_memberships(config: &Config, client: &Client) -> Option<Vec<Memb
 
     let html = response.text().await.unwrap();
     if html.contains("Sorry you're not authenticated") {
-        log::error!("Failed to scrape members, invalid cookie");
+        log::error!("Failed to scrape members, cookie not providing authenticated access");
         return None;
     }
     let html = scraper::Html::parse_document(&html);

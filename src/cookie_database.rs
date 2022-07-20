@@ -2,9 +2,9 @@ use std::string::String;
 
 use fallible_iterator::FallibleIterator;
 use reqwest::cookie::CookieStore;
+use reqwest::header::HeaderValue;
+use reqwest::Url;
 use rusqlite::{params, Connection};
-
-use crate::{HeaderValue, Url};
 
 pub struct CookieDatabase {
     conn: Connection,
@@ -29,7 +29,7 @@ impl CookieDatabase {
     pub fn get_cookie_value(&self, url: &Url) -> Option<String> {
         self.conn
             .query_row(
-                "SELECT name, value FROM cookies WHERE url = ?1",
+                "SELECT value FROM cookies WHERE url = ?1",
                 params![url.to_string()],
                 |r| r.get(0),
             )
