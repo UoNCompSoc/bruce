@@ -26,13 +26,14 @@ impl CookieDatabase {
             .unwrap();
     }
 
-    pub fn get_cookie(&self, url: &Url) -> Option<String> {
-        self.conn.query_row("SELECT name, value FROM cookies WHERE url = ?1", params![url.to_string()], |r| {
-            let mut s: String = r.get(0).unwrap();
-            s.push('=');
-            s.push_str(r.get::<usize, String>(1).unwrap().as_str());
-            Ok(s)
-        }).ok()
+    pub fn get_cookie_value(&self, url: &Url) -> Option<String> {
+        self.conn
+            .query_row(
+                "SELECT name, value FROM cookies WHERE url = ?1",
+                params![url.to_string()],
+                |r| r.get(0),
+            )
+            .ok()
     }
 }
 

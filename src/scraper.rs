@@ -53,7 +53,7 @@ async fn main() {
         .unwrap();
 
     let mut memberships = None;
-    if let Some(cookie) = cookie_jar.get_cookie(&config.members_url) {
+    if let Some(cookie) = cookie_jar.get_cookie_value(&config.members_url) {
         log::info!("Trying saved cookie: {}", cookie);
         memberships = scrape_memberships(&config, &client).await;
     }
@@ -70,7 +70,7 @@ async fn main() {
         panic!("Failed to scrape members with known cookies, try obtaining another one")
     }
     run().await;
-    let schedule = tokio_schedule::every(30).seconds().perform(run);
+    let schedule = tokio_schedule::every(2).hours().perform(run);
     tokio::spawn(schedule).await.expect("keep running");
 }
 
