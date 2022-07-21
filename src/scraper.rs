@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use crate::cookie_database::CookieDatabase;
-use reqwest::{Client, StatusCode, Url};
+use reqwest::{Client, StatusCode};
 use rusqlite::Connection;
 use scraper::Selector;
 use tokio_schedule::Job;
@@ -15,20 +15,20 @@ pub(crate) async fn run(config: Config) {
     let conn = Connection::open(&config.sqlite_file).expect("failed to open sqlite connection");
     Membership::init_table(&conn);
 
-    let cookie_jar = Arc::new(CookieDatabase::new(config.sqlite_file.as_str()));
+    let cookie_db = Arc::new(CookieDatabase::new(config.sqlite_file.as_str()));
     let client = Client::builder()
-        .cookie_provider(cookie_jar.clone())
+        .cookie_provider(cookie_db.clone())
         .build()
         .unwrap();
 
     let mut memberships = None;
-    if let Some(cookie) = cookie_jar.get_cookie_value(&config.members_url) {
+    if let Some(cookie) = cookie_db.get_cookie_value(&config.members_url) {
         log::info!("Trying saved cookie: {}", cookie);
         memberships = scrape_memberships(&config, &client).await;
     }
     if memberships.is_none() {
         log::info!("Trying initial cookie: {}", &config.initial_cookie_value);
-        cookie_jar.add_cookie(
+        cookie_db.add_cookie(
             &config.members_url,
             "su_session",
             &config.initial_cookie_value,
