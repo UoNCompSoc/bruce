@@ -1,21 +1,17 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use crate::config::Config;
 use crate::cookie_database::CookieDatabase;
 use reqwest::{Client, StatusCode};
-use rusqlite::Connection;
 use scraper::Selector;
 use tokio_schedule::Job;
-use crate::config::Config;
 
 use crate::membership::Membership;
 
 pub(crate) async fn run(config: Config) {
     log::info!("Scraper starting");
-    let conn = Connection::open(&config.sqlite_file).expect("failed to open sqlite connection");
-    Membership::init_table(&conn);
-
-    let cookie_db = Arc::new(CookieDatabase::new(config.sqlite_file.as_str()));
+    let cookie_db = Arc::new(CookieDatabase::new(config.get_sqlite_conn()));
     let client = Client::builder()
         .cookie_provider(cookie_db.clone())
         .build()
@@ -45,13 +41,13 @@ pub(crate) async fn run(config: Config) {
 
 async fn local_run() {
     let config = Config::generate();
-    let cookie_jar = Arc::new(CookieDatabase::new(&config.sqlite_file));
+    let cookie_jar = Arc::new(CookieDatabase::new(config.get_sqlite_conn()));
     let client = Client::builder()
         .cookie_provider(cookie_jar.clone())
         .build()
         .unwrap();
     if let Some(memberships) = scrape_memberships(&config, &client).await {
-        let conn = Connection::open(&config.sqlite_file).expect("failed to open sqlite connection");
+        let conn = config.get_sqlite_conn();
         for mut membership in Membership::get_all(&conn) {
             let student_ids: HashSet<u32> = memberships.iter().map(|m| m.student_id).collect();
             if !student_ids.contains(&membership.student_id) {

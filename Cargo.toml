@@ -10,10 +10,10 @@ name = "bruce"
 dotenv = "0.15"
 log = "0.4"
 env_logger = "0.9"
-tokio = {version = "1.19", features = ["rt-multi-thread"]}
+tokio = { version = "1.19", features = ["rt-multi-thread"] }
 tokio_schedule = "0.3"
-rusqlite = { version = "0.27"}
-reqwest = {version = "0.11", features = ["cookies"]}
+rusqlite = { version = "0.27", features = ["bundled"] }
+reqwest = { version = "0.11", features = ["cookies"] }
 poise = "0.2"
 scraper = "0.13"
 fallible-iterator = "0.2"

@@ -1,4 +1,5 @@
 /target
 /.idea
 /.env
-/db.sqlite
+/data
+**.sqlite

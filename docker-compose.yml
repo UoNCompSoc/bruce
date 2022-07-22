@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  bruce:
+    image: ghcr.io/uoncompsoc/bruce:dev
+    container_name: bruce
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data

@@ -11,10 +11,14 @@ pub struct CookieDatabase {
 }
 
 impl CookieDatabase {
-    pub fn new(sqlite_file: &str) -> Self {
-        let conn = Connection::open(sqlite_file).expect("failed to open sqlite connection");
+    pub fn init_table(conn: &Connection) {
         conn.execute("CREATE TABLE IF NOT EXISTS cookies (url VARCHAR NOT NULL PRIMARY KEY, name VARCHAR NOT NULL, value VARCHAR NOT NULL)", params![]).expect("initialise cookies table");
-        Self { conn }
+    }
+
+    pub fn new(conn: Connection) -> Self {
+        Self {
+            conn,
+        }
     }
 
     pub fn add_cookie<T: Into<String>>(&self, url: &Url, key: T, value: T) {
@@ -79,11 +83,12 @@ impl CookieStore for CookieDatabase {
 
 #[cfg(test)]
 mod tests {
-    use std::env::temp_dir;
+    use crate::cookie_database::CookieDatabase;
     use reqwest::cookie::CookieStore;
     use reqwest::header::HeaderValue;
     use reqwest::Url;
-    use crate::cookie_database::CookieDatabase;
+    use std::env::temp_dir;
+    use rusqlite::Connection;
 
     #[test]
     fn in_out() {
@@ -91,10 +96,10 @@ mod tests {
         test_db.push("test");
         test_db.set_extension("db");
         std::fs::remove_file(&test_db).unwrap_or(());
-        let db = CookieDatabase::new(test_db.to_str().unwrap());
+        let db = CookieDatabase::new(Connection::open(test_db).unwrap());
 
         let url = Url::parse("https://test.com").unwrap();
-        let header_values= vec![HeaderValue::from_str("test=1234").unwrap()]; // dyn Iterator<Item = &HeaderValue>
+        let header_values = vec![HeaderValue::from_str("test=1234").unwrap()]; // dyn Iterator<Item = &HeaderValue>
         db.set_cookies(&mut header_values.iter(), &url);
         let output = db.cookies(&url);
         assert!(output.is_some());

@@ -1,10 +1,13 @@
 use poise::serenity_prelude::Http;
 use reqwest::Url;
+use rusqlite::Connection;
+use std::fs::OpenOptions;
+use std::path::PathBuf;
 
 #[derive(Clone)]
 pub struct Config {
     pub(crate) members_url: Url,
-    pub(crate) sqlite_file: String,
+    pub(crate) data_dir: String,
     pub(crate) initial_cookie_value: String,
     pub(crate) discord_token: String,
     pub(crate) member_role_name: String,
@@ -20,7 +23,7 @@ impl Config {
                 .expect("MEMBERS_URL")
                 .parse::<Url>()
                 .expect("valid MEMBERS_URL"),
-            sqlite_file: std::env::var("SQLITE_FILE").unwrap_or_else(|_| "db.sqlite".to_string()),
+            data_dir: std::env::var("DATA_DIR").unwrap_or_else(|_| "/data".to_string()),
             initial_cookie_value: std::env::var("INITIAL_SUMS_COOKIE_VALUE")
                 .expect("INITIAL_SUMS_COOKIE_VALUE"),
             discord_token: std::env::var("DISCORD_TOKEN").expect("missing DISCORD_TOKEN"),
@@ -38,5 +41,22 @@ impl Config {
 
     pub(crate) fn get_http(&self) -> Http {
         Http::new(self.discord_token.as_str())
+    }
+
+    pub(crate) fn get_sqlite_file(&self) -> PathBuf {
+        let mut file = PathBuf::from(&self.data_dir);
+        file.push("db");
+        file.set_extension("sqlite");
+        file
+    }
+
+    pub(crate) fn get_sqlite_conn(&self) -> Connection {
+        let file = self.get_sqlite_file();
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&file)
+            .expect("creating sqlite db file");
+        Connection::open(&file).expect("opening sqlite db")
     }
 }

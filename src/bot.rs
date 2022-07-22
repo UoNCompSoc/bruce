@@ -10,7 +10,7 @@ type Context<'a> = poise::Context<'a, Config, Error>;
 
 pub(crate) async fn run(config: Config) {
     log::info!("Bot starting");
-    let conn = Connection::open(&config.sqlite_file).unwrap();
+    let conn = config.get_sqlite_conn();
     Membership::init_table(&conn);
     let framework = poise::Framework::build()
         .options(poise::FrameworkOptions {
@@ -69,7 +69,7 @@ async fn register(
     ))
     .await?;
 
-    let conn = Connection::open(&data.sqlite_file).expect("failed to open sqlite connection");
+    let conn = data.get_sqlite_conn();
 
     if Membership::get_by_discord_id(&conn, *target_member.user.id.as_u64()).is_some() {
         ctx.say(format!(
@@ -132,7 +132,7 @@ async fn unregister(
             .await?;
         return Ok(());
     }
-    let conn = Connection::open(&ctx.data().sqlite_file).expect("open sqlite db");
+    let conn = ctx.data().get_sqlite_conn();
     target_member
         .remove_role(ctx.data().get_http(), get_member_role(ctx))
         .await?;
@@ -152,7 +152,7 @@ async fn prune(ctx: Context<'_>) -> Result<(), Error> {
             .await?;
         return Ok(());
     }
-    let conn = Connection::open(&ctx.data().sqlite_file).expect("open sqlite db");
+    let conn = ctx.data().get_sqlite_conn();
     let memberships: Vec<Membership> = Membership::get_all(&conn)
         .into_iter()
         .filter(|m| m.should_drop)
