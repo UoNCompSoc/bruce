@@ -39,7 +39,8 @@ pub(crate) async fn run(config: Config) {
     tokio::spawn(schedule).await.expect("keep running");
 }
 
-async fn local_run() {
+// TODO: Make this the run function instead and start the schedule from main
+pub(crate) async fn local_run() {
     let config = Config::generate();
     let cookie_jar = Arc::new(CookieDatabase::new(config.get_sqlite_conn()));
     let client = Client::builder()

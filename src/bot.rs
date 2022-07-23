@@ -1,6 +1,5 @@
 use poise::serenity_prelude::{Member, RoleId, UserId};
 use poise::{serenity_prelude as serenity, PrefixFrameworkOptions};
-use rusqlite::Connection;
 
 use crate::config::Config;
 use crate::membership::Membership;

@@ -22,8 +22,8 @@ async fn main() {
     Membership::init_table(&conn);
     CookieDatabase::init_table(&conn);
 
-    // let scraper = tokio::spawn(scraper::run(config.clone()));
+    let scraper = tokio::spawn(scraper::run(config.clone()));
     let bot = tokio::spawn(bot::run(config.clone()));
-    // scraper.await.unwrap();
+    scraper.await.unwrap();
     bot.await.unwrap();
 }

@@ -8,8 +8,7 @@ CMD ["/bruce/target/release/bruce"]
 
 #FROM gcr.io/distroless/cc
 FROM archlinux
-USER 1000
 WORKDIR /app
-COPY --from=builder /bruce/target/release/bruce ./
 VOLUME /data
+COPY --from=builder /bruce/target/release/bruce ./
 CMD ["/app/bruce"]
