@@ -4,8 +4,10 @@ services:
     image: ghcr.io/uoncompsoc/bruce:dev
     container_name: bruce
     build: .
+    environment:
+      PUID: 1000
+      PGID: 1000
     env_file:
       - .env
-    user: "1000:1000"
     volumes:
       - ./data:/data

@@ -1,14 +1,15 @@
-FROM rust:latest AS builder
+FROM docker.io/clux/muslrust:latest AS builder
+WORKDIR /
 RUN update-ca-certificates
-RUN USER=root cargo new --bin bruce
+RUN cargo new --bin bruce
 WORKDIR ./bruce
-COPY . ./
+COPY Cargo.toml Cargo.lock ./
 RUN cargo build --release
-CMD ["/bruce/target/release/bruce"]
+RUN rm -rd src target/x86_64-unknown-linux-musl/release/deps/bruce*
+COPY src ./src
+RUN cargo build --release
 
-#FROM gcr.io/distroless/cc
-FROM archlinux
-WORKDIR /app
+FROM docker.io/lsiobase/alpine:3.15
 VOLUME /data
-COPY --from=builder /bruce/target/release/bruce ./
-CMD ["/app/bruce"]
+COPY root/ /
+COPY --from=builder /bruce/target/x86_64-unknown-linux-musl/release/bruce /app/bruce
