@@ -5,7 +5,7 @@ use std::fs::OpenOptions;
 use std::path::PathBuf;
 
 #[derive(Clone)]
-pub struct Config {
+pub(crate) struct Config {
     pub(crate) members_url: Url,
     pub(crate) data_dir: String,
     pub(crate) initial_cookie_value: String,
