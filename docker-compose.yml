@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   bruce:
-    image: ghcr.io/uoncompsoc/bruce:dev
+    image: ghcr.io/uoncompsoc/bruce:latest
     container_name: bruce
     build: .
     environment:

@@ -22,9 +22,7 @@ pub(crate) async fn run(config: Config) {
         })
         .token(&config.discord_token)
         .intents(
-            serenity::GatewayIntents::non_privileged()
-                | serenity::GatewayIntents::GUILD_MEMBERS
-                | serenity::GatewayIntents::MESSAGE_CONTENT,
+            serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT,
         )
         .user_data_setup(|_ctx, _ready, _framework| Box::pin(async { Ok(config) }));
 
