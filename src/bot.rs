@@ -1,5 +1,5 @@
 use poise::serenity_prelude::{Member, RoleId, UserId};
-use poise::{serenity_prelude as serenity, PrefixFrameworkOptions};
+use poise::{serenity_prelude as serenity, FrameworkBuilder, PrefixFrameworkOptions};
 
 use crate::config::Config;
 use crate::membership::Membership;
@@ -7,11 +7,8 @@ use crate::membership::Membership;
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Config, Error>;
 
-pub(crate) async fn run(config: Config) {
-    log::info!("Bot starting");
-    let conn = config.get_sqlite_conn();
-    Membership::init_table(&conn);
-    let framework = poise::Framework::build()
+pub(crate) fn build_framework(config: Config) -> FrameworkBuilder<Config, Error> {
+    poise::Framework::build()
         .options(poise::FrameworkOptions {
             commands: vec![setup_commands(), register(), unregister(), prune()],
             prefix_options: PrefixFrameworkOptions {
@@ -24,9 +21,7 @@ pub(crate) async fn run(config: Config) {
         .intents(
             serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT,
         )
-        .user_data_setup(|_ctx, _ready, _framework| Box::pin(async { Ok(config) }));
-
-    framework.run().await.unwrap();
+        .user_data_setup(|_ctx, _ready, _framework| Box::pin(async { Ok(config) }))
 }
 
 #[poise::command(prefix_command)]

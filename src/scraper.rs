@@ -5,12 +5,10 @@ use crate::config::Config;
 use crate::cookie_database::CookieDatabase;
 use reqwest::{Client, StatusCode};
 use scraper::Selector;
-use tokio_schedule::Job;
 
 use crate::membership::Membership;
 
-pub(crate) async fn run(config: Config) {
-    log::info!("Scraper starting");
+pub(crate) async fn init(config: Config) {
     let cookie_db = Arc::new(CookieDatabase::new(config.get_sqlite_conn()));
     let client = Client::builder()
         .cookie_provider(cookie_db.clone())
@@ -34,13 +32,10 @@ pub(crate) async fn run(config: Config) {
     if memberships.is_none() {
         panic!("Failed to scrape members with known cookies, try obtaining another one")
     }
-    local_run().await;
-    let schedule = tokio_schedule::every(2).hours().perform(local_run);
-    tokio::spawn(schedule).await.expect("keep running");
+    run().await;
 }
 
-// TODO: Make this the run function instead and start the schedule from main
-pub(crate) async fn local_run() {
+pub(crate) async fn run() {
     let config = Config::generate();
     let cookie_jar = Arc::new(CookieDatabase::new(config.get_sqlite_conn()));
     let client = Client::builder()

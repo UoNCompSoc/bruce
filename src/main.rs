@@ -1,3 +1,4 @@
+use tokio_schedule::Job;
 use crate::config::Config;
 use crate::cookie_database::CookieDatabase;
 use crate::membership::Membership;
@@ -22,8 +23,9 @@ async fn main() {
     Membership::init_table(&conn);
     CookieDatabase::init_table(&conn);
 
-    let scraper = tokio::spawn(scraper::run(config.clone()));
-    let bot = tokio::spawn(bot::run(config.clone()));
+    scraper::init(config.clone()).await;
+    let scraper = tokio::spawn(tokio_schedule::every(2).hours().perform(scraper::run));
+    let bot = tokio::spawn(bot::build_framework(config.clone()).run());
     scraper.await.unwrap();
-    bot.await.unwrap();
+    bot.await.unwrap().unwrap();
 }
