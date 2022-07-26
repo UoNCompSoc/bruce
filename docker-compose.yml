@@ -3,8 +3,11 @@ services:
   bruce:
     image: ghcr.io/uoncompsoc/bruce:latest
     container_name: bruce
-    build: .
+    restart: unless-stopped
+# Uncomment this line for local development
+#    build: .
     environment:
+# These are the uid and gid of your linux user (so that the data directory has the correct permissions)
       PUID: 1000
       PGID: 1000
     env_file:
