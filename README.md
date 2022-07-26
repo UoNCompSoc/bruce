@@ -36,6 +36,8 @@ You need 2 things for this bot to work:
 3. Download the [example.env](https://github.com/UoNCompSoc/bruce/blob/main/example.env), rename it to `.env` and place it in the same folder
 4. Fill out the `.env` file with the details we collected earlier, there's a breakdown of each variable below. The mandatory ones are: `DISCORD_TOKEN`, `MEMBERS_URL` and `INITIAL_SUMS_COOKIE_VALUE`
 5. Start the container with `docker-compose up -d` and check the logs with `docker-compose logs`
+6. In your Discord server, send a message (where the bot can see it): `bruce!setup_commands`, this will give Discord the list of slash commands the bot has.
+7. Now you can use the slash commands by typing a `/` and picking the one you want.
 
 ### Variables
 
@@ -48,4 +50,19 @@ You need 2 things for this bot to work:
 | PRIVILEGED_ROLE_NAME      | True                                                                | Committee | N/A                                                                     | This is the role of people that can run the bots management commands |
 | MEMBERSHIP_PURCHASE_URL   | True                                                                | N/A       | https://su.nottingham.ac.uk/shop/product/31-computer-science-membership | This is a link that your members can go to to purchase a membership  |
 
+## Bot Usage
 
+Bruce has 3 main commands:
+
+### /register
+
+Register allows any user to provide their student id to verify that they are a member of the society. If the check passes, Bruce will give them your defined member role and also set their nickname to their real name.
+
+### /unregister
+
+Unregister allows privileged users (usually committee) to unregister a specific discord user in the event something goes awry. For example, a user may /register with a student id other than their own.  
+Unregistering a user should be done via Bruce otherwise Bruce will still think that the user is registered. Removing the user's role is not enough.
+
+### /prune
+
+Prune allows privileged users (usually committee) to bulk unregister users whose memberships have expired. This would be a scheduled task however since memberships can be bought at any time of the year, I decided to leave it up to the society to decide when to prune.
