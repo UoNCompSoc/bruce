@@ -15,6 +15,7 @@ You need 2 things for this bot to work:
 2. Login to your student dashboard
 3. Using your cookie tool, find the cookie with url `student-dashboard.sums.su` and name `su_session`.
 4. Save the value of that cookie, it should look something like this: `dvpsnk67tme2eal2qu44627o4p20iviv`
+5. Note that the IP that you obtain the cookie from must be the same one that the bot will use.
 
 ### Discord bot
 
