@@ -1,9 +1,9 @@
+use crate::error::Error;
 use poise::serenity_prelude::Http;
 use reqwest::Url;
 use rusqlite::Connection;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
-use crate::error::Error;
 
 #[derive(Clone)]
 pub(crate) struct Config {
@@ -53,10 +53,7 @@ impl Config {
 
     pub(crate) fn get_sqlite_conn(&self) -> Result<Connection, Error> {
         let file = self.get_sqlite_file();
-        OpenOptions::new()
-            .create(true)
-            .write(true)
-            .open(&file)?;
+        OpenOptions::new().create(true).write(true).open(&file)?;
         Ok(Connection::open(&file)?)
     }
 }

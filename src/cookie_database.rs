@@ -1,11 +1,11 @@
 use std::string::String;
 
+use crate::error::Error;
 use fallible_iterator::FallibleIterator;
 use reqwest::cookie::CookieStore;
 use reqwest::header::HeaderValue;
 use reqwest::Url;
 use rusqlite::{params, Connection};
-use crate::error::Error;
 
 pub struct CookieDatabase {
     conn: Connection,
@@ -18,27 +18,23 @@ impl CookieDatabase {
     }
 
     pub fn new(conn: Connection) -> Self {
-        Self {
-            conn,
-        }
+        Self { conn }
     }
 
     pub fn add_cookie<T: Into<String>>(&self, url: &Url, key: T, value: T) -> Result<(), Error> {
-        self.conn
-            .execute(
-                "INSERT OR REPLACE INTO cookies (url, name, value) VALUES (?1, ?2, ?3)",
-                params![url.to_string(), key.into(), value.into()],
-            )?;
+        self.conn.execute(
+            "INSERT OR REPLACE INTO cookies (url, name, value) VALUES (?1, ?2, ?3)",
+            params![url.to_string(), key.into(), value.into()],
+        )?;
         Ok(())
     }
 
     pub fn get_cookie_value(&self, url: &Url) -> Result<String, Error> {
-        Ok(self.conn
-            .query_row(
-                "SELECT value FROM cookies WHERE url = ?1",
-                params![url.to_string()],
-                |r| r.get(0),
-            )?)
+        Ok(self.conn.query_row(
+            "SELECT value FROM cookies WHERE url = ?1",
+            params![url.to_string()],
+            |r| r.get(0),
+        )?)
     }
 }
 
@@ -48,7 +44,8 @@ impl CookieStore for CookieDatabase {
     fn set_cookies(&self, cookie_headers: &mut dyn Iterator<Item = &HeaderValue>, url: &Url) {
         for header in cookie_headers {
             let header = header
-                .to_str().unwrap_or_else(|_| panic!("converting header to str {:?}", header));
+                .to_str()
+                .unwrap_or_else(|_| panic!("converting header to str {:?}", header));
             log::info!("Storing header: {}", header);
             let mut header = header
                 .split(';')
@@ -89,8 +86,8 @@ mod tests {
     use reqwest::cookie::CookieStore;
     use reqwest::header::HeaderValue;
     use reqwest::Url;
-    use std::env::temp_dir;
     use rusqlite::Connection;
+    use std::env::temp_dir;
 
     #[test]
     fn in_out() {
