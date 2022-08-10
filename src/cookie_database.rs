@@ -5,14 +5,16 @@ use reqwest::cookie::CookieStore;
 use reqwest::header::HeaderValue;
 use reqwest::Url;
 use rusqlite::{params, Connection};
+use crate::error::Error;
 
 pub struct CookieDatabase {
     conn: Connection,
 }
 
 impl CookieDatabase {
-    pub fn init_table(conn: &Connection) {
-        conn.execute("CREATE TABLE IF NOT EXISTS cookies (url VARCHAR NOT NULL PRIMARY KEY, name VARCHAR NOT NULL, value VARCHAR NOT NULL)", params![]).expect("initialise cookies table");
+    pub fn init_table(conn: &Connection) -> Result<(), Error> {
+        conn.execute("CREATE TABLE IF NOT EXISTS cookies (url VARCHAR NOT NULL PRIMARY KEY, name VARCHAR NOT NULL, value VARCHAR NOT NULL)", params![])?;
+        Ok(())
     }
 
     pub fn new(conn: Connection) -> Self {
@@ -21,23 +23,22 @@ impl CookieDatabase {
         }
     }
 
-    pub fn add_cookie<T: Into<String>>(&self, url: &Url, key: T, value: T) {
+    pub fn add_cookie<T: Into<String>>(&self, url: &Url, key: T, value: T) -> Result<(), Error> {
         self.conn
             .execute(
                 "INSERT OR REPLACE INTO cookies (url, name, value) VALUES (?1, ?2, ?3)",
                 params![url.to_string(), key.into(), value.into()],
-            )
-            .expect("adding cookie");
+            )?;
+        Ok(())
     }
 
-    pub fn get_cookie_value(&self, url: &Url) -> Option<String> {
-        self.conn
+    pub fn get_cookie_value(&self, url: &Url) -> Result<String, Error> {
+        Ok(self.conn
             .query_row(
                 "SELECT value FROM cookies WHERE url = ?1",
                 params![url.to_string()],
                 |r| r.get(0),
-            )
-            .ok()
+            )?)
     }
 }
 
@@ -47,19 +48,20 @@ impl CookieStore for CookieDatabase {
     fn set_cookies(&self, cookie_headers: &mut dyn Iterator<Item = &HeaderValue>, url: &Url) {
         for header in cookie_headers {
             let header = header
-                .to_str()
-                .unwrap_or_else(|_| panic!("converting header to str {:?}", header));
+                .to_str().unwrap_or_else(|_| panic!("converting header to str {:?}", header));
             log::info!("Storing header: {}", header);
             let mut header = header
                 .split(';')
                 .next()
                 .expect("getting key value pair from header")
                 .split('=');
-            self.add_cookie(
+            if let Err(err) = self.add_cookie(
                 url,
                 header.next().expect("getting key from header"),
                 header.next().expect("getting value from header"),
-            );
+            ) {
+                log::error!("{}", err);
+            }
         }
     }
 

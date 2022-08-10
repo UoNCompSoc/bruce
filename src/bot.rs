@@ -2,9 +2,9 @@ use poise::serenity_prelude::{Member, RoleId, UserId};
 use poise::{serenity_prelude as serenity, FrameworkBuilder, PrefixFrameworkOptions};
 
 use crate::config::Config;
+use crate::error::Error;
 use crate::membership::Membership;
 
-type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Config, Error>;
 
 pub(crate) fn build_framework(config: Config) -> FrameworkBuilder<Config, Error> {
@@ -40,16 +40,22 @@ async fn register(
     target_member: Option<Member>,
 ) -> Result<(), Error> {
     let data = ctx.data();
-    let author_member = ctx.author_member().await.unwrap();
-    if target_member.is_some()
-        && author_member.user.id != target_member.as_ref().unwrap().user.id
-        && !author_member.roles.contains(&get_privileged_role(ctx))
-    {
-        ctx.say("You don't have the required permissions to target a user")
-            .await?;
-        return Ok(());
-    }
-    let mut target_member = target_member.unwrap_or_else(|| author_member.clone());
+    let author_member = ctx
+        .author_member()
+        .await
+        .ok_or("Failed to retrieve calling user")?;
+    let mut target_member = if let Some(target_member) = target_member {
+        if author_member.user.id != target_member.user.id
+            && !author_member.roles.contains(&get_privileged_role(ctx)?)
+        {
+            ctx.say("You don't have the required permissions to target a user")
+                .await?;
+            return Ok(());
+        }
+        target_member
+    } else {
+        author_member.clone()
+    };
     if student_id.to_string().len() != data.student_id_length {
         ctx.say("I don't think that's a student id!").await?;
         return Ok(());
@@ -61,11 +67,11 @@ async fn register(
     ))
     .await?;
 
-    let conn = data.get_sqlite_conn();
+    let conn = data.get_sqlite_conn()?;
 
-    if Membership::get_by_discord_id(&conn, *target_member.user.id.as_u64()).is_some() {
+    if Membership::get_by_discord_id(&conn, *target_member.user.id.as_u64()).is_ok() {
         ctx.say(format!(
-            "Target user ({}) is already registered, use /unregister to remove them",
+            "Target user ({}) is already registered, use /unregister to remove them or @ a committee member",
             target_member.display_name()
         ))
         .await?;
@@ -74,7 +80,7 @@ async fn register(
 
     let membership = Membership::get_by_student_id(&conn, student_id);
 
-    if membership.is_none() {
+    if membership.is_err() {
         let mut membership_link = "".to_string();
         if let Some(x) = &data.membership_purchase_url {
             membership_link = format!("You can grab a membership at {}\n", x);
@@ -92,10 +98,10 @@ async fn register(
         }
     }
 
-    membership.update_disord_id(&conn, Some(*target_member.user.id.as_u64()));
+    membership.update_disord_id(&conn, Some(*target_member.user.id.as_u64()))?;
 
     target_member
-        .add_role(ctx.data().get_http(), get_member_role(ctx))
+        .add_role(ctx.data().get_http(), get_member_role(ctx)?)
         .await?;
 
     let result = target_member
@@ -118,18 +124,21 @@ async fn unregister(
     ctx: Context<'_>,
     #[description = "The discord member to unregister"] mut target_member: Member,
 ) -> Result<(), Error> {
-    let author_member = ctx.author_member().await.unwrap();
-    if !author_member.roles.contains(&get_privileged_role(ctx)) {
+    let author_member = ctx
+        .author_member()
+        .await
+        .ok_or_else(|| Error::from("Failed to retrieve calling user"))?;
+    if !author_member.roles.contains(&get_privileged_role(ctx)?) {
         ctx.say("Only privileged users can run this command")
             .await?;
         return Ok(());
     }
-    let conn = ctx.data().get_sqlite_conn();
+    let conn = ctx.data().get_sqlite_conn()?;
     target_member
-        .remove_role(ctx.data().get_http(), get_member_role(ctx))
+        .remove_role(ctx.data().get_http(), get_member_role(ctx)?)
         .await?;
-    if let Some(mut m) = Membership::get_by_discord_id(&conn, *target_member.user.id.as_u64()) {
-        m.update_disord_id(&conn, None)
+    if let Ok(mut m) = Membership::get_by_discord_id(&conn, *target_member.user.id.as_u64()) {
+        m.update_disord_id(&conn, None)?;
     }
     ctx.say("User unregistered").await?;
     Ok(())
@@ -137,15 +146,18 @@ async fn unregister(
 
 #[poise::command(slash_command, guild_only)]
 async fn prune(ctx: Context<'_>) -> Result<(), Error> {
-    let author_member = ctx.author_member().await.unwrap();
+    let author_member = ctx
+        .author_member()
+        .await
+        .ok_or("Failed to retrieve calling user")?;
     log::info!("Prune called by {}", author_member.display_name());
-    if !author_member.roles.contains(&get_privileged_role(ctx)) {
+    if !author_member.roles.contains(&get_privileged_role(ctx)?) {
         ctx.say("Only privileged users can run this command")
             .await?;
         return Ok(());
     }
-    let conn = ctx.data().get_sqlite_conn();
-    let memberships: Vec<Membership> = Membership::get_all(&conn)
+    let conn = ctx.data().get_sqlite_conn()?;
+    let memberships: Vec<Membership> = Membership::get_all(&conn)?
         .into_iter()
         .filter(|m| m.should_drop)
         .collect();
@@ -155,32 +167,32 @@ async fn prune(ctx: Context<'_>) -> Result<(), Error> {
         if let Some(discord_id) = membership.discord_id {
             let mut member = ctx
                 .guild()
-                .unwrap()
+                .ok_or("Failed to retrieve server information")?
                 .member(ctx.data().get_http(), UserId::from(discord_id))
-                .await
-                .unwrap();
+                .await?;
             member
-                .remove_role(ctx.data().get_http(), get_member_role(ctx))
+                .remove_role(ctx.data().get_http(), get_member_role(ctx)?)
                 .await?;
             log::info!("Removing roles from {}", membership.student_id);
         }
-        membership.delete(&conn);
+        membership.delete(&conn)?;
     }
     Ok(())
 }
 
-fn get_member_role(ctx: Context<'_>) -> RoleId {
-    ctx.guild()
-        .unwrap()
-        .role_by_name(ctx.data().member_role_name.as_str())
-        .unwrap()
-        .id
+fn get_member_role(ctx: Context<'_>) -> Result<RoleId, Error> {
+    get_role_id(ctx, ctx.data().member_role_name.as_str())
 }
 
-fn get_privileged_role(ctx: Context<'_>) -> RoleId {
-    ctx.guild()
-        .unwrap()
-        .role_by_name(ctx.data().privileged_role_name.as_str())
-        .unwrap()
-        .id
+fn get_privileged_role(ctx: Context<'_>) -> Result<RoleId, Error> {
+    get_role_id(ctx, ctx.data().privileged_role_name.as_str())
+}
+
+fn get_role_id(ctx: Context<'_>, role_name: &str) -> Result<RoleId, Error> {
+    Ok(ctx
+        .guild()
+        .ok_or("Failed to retrieve server information")?
+        .role_by_name(role_name)
+        .ok_or(format!("Role {} could not be found", role_name))?
+        .id)
 }
