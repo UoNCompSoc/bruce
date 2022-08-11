@@ -9,7 +9,7 @@ use scraper::Selector;
 
 use crate::membership::Membership;
 
-pub(crate) async fn init(config: Config) -> Result<()> {
+pub async fn init(config: Config) -> Result<()> {
     let cookie_db = Arc::new(CookieDatabase::new(config.get_sqlite_conn()?));
     let client = Client::builder()
         .cookie_provider(cookie_db.clone())
@@ -38,7 +38,7 @@ pub(crate) async fn init(config: Config) -> Result<()> {
     Ok(())
 }
 
-pub(crate) async fn run() {
+pub async fn run() {
     let config = Config::generate();
     let cookie_jar = Arc::new(CookieDatabase::new(match config.get_sqlite_conn() {
         Ok(conn) => conn,

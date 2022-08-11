@@ -7,7 +7,7 @@ use crate::membership::Membership;
 
 type Context<'a> = poise::Context<'a, Config, Error>;
 
-pub(crate) fn build_framework(config: Config) -> FrameworkBuilder<Config, Error> {
+pub fn build_framework(config: Config) -> FrameworkBuilder<Config, Error> {
     poise::Framework::build()
         .options(poise::FrameworkOptions {
             commands: vec![setup_commands(), register(), unregister(), prune()],
