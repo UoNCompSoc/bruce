@@ -1,8 +1,8 @@
+use anyhow::{anyhow, Error, Result};
 use poise::serenity_prelude::{Member, RoleId, UserId};
 use poise::{serenity_prelude as serenity, FrameworkBuilder, PrefixFrameworkOptions};
 
 use crate::config::Config;
-use crate::error::Error;
 use crate::membership::Membership;
 
 type Context<'a> = poise::Context<'a, Config, Error>;
@@ -38,12 +38,12 @@ async fn register(
     student_id: u32,
     #[description = "Discord member to perform registration on, or if empty, yourself"]
     target_member: Option<Member>,
-) -> Result<(), Error> {
+) -> Result<()> {
     let data = ctx.data();
     let author_member = ctx
         .author_member()
         .await
-        .ok_or("Failed to retrieve calling user")?;
+        .ok_or_else(|| anyhow!("Failed to retrieve calling user"))?;
     let mut target_member = if let Some(target_member) = target_member {
         if author_member.user.id != target_member.user.id
             && !author_member.roles.contains(&get_privileged_role(ctx)?)
@@ -127,7 +127,7 @@ async fn unregister(
     let author_member = ctx
         .author_member()
         .await
-        .ok_or_else(|| Error::from("Failed to retrieve calling user"))?;
+        .ok_or_else(|| anyhow!("Failed to retrieve calling user"))?;
     if !author_member.roles.contains(&get_privileged_role(ctx)?) {
         ctx.say("Only privileged users can run this command")
             .await?;
@@ -149,7 +149,7 @@ async fn prune(ctx: Context<'_>) -> Result<(), Error> {
     let author_member = ctx
         .author_member()
         .await
-        .ok_or("Failed to retrieve calling user")?;
+        .ok_or_else(|| anyhow!("Failed to retrieve calling user"))?;
     log::info!("Prune called by {}", author_member.display_name());
     if !author_member.roles.contains(&get_privileged_role(ctx)?) {
         ctx.say("Only privileged users can run this command")
@@ -167,7 +167,7 @@ async fn prune(ctx: Context<'_>) -> Result<(), Error> {
         if let Some(discord_id) = membership.discord_id {
             let mut member = ctx
                 .guild()
-                .ok_or("Failed to retrieve server information")?
+                .ok_or_else(|| anyhow!("Failed to retrieve server information"))?
                 .member(ctx.data().get_http(), UserId::from(discord_id))
                 .await?;
             member
@@ -191,8 +191,8 @@ fn get_privileged_role(ctx: Context<'_>) -> Result<RoleId, Error> {
 fn get_role_id(ctx: Context<'_>, role_name: &str) -> Result<RoleId, Error> {
     Ok(ctx
         .guild()
-        .ok_or("Failed to retrieve server information")?
+        .ok_or_else(|| anyhow!("Failed to retrieve server information"))?
         .role_by_name(role_name)
-        .ok_or(format!("Role {} could not be found", role_name))?
+        .ok_or_else(|| anyhow!("Role {} could not be found", role_name))?
         .id)
 }

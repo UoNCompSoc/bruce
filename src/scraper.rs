@@ -3,18 +3,18 @@ use std::sync::Arc;
 
 use crate::config::Config;
 use crate::cookie_database::CookieDatabase;
-use crate::error::Error;
+use anyhow::{anyhow, Error, Result};
 use reqwest::{Client, StatusCode};
 use scraper::Selector;
 
 use crate::membership::Membership;
 
-pub(crate) async fn init(config: Config) -> Result<(), Error> {
+pub(crate) async fn init(config: Config) -> Result<()> {
     let cookie_db = Arc::new(CookieDatabase::new(config.get_sqlite_conn()?));
     let client = Client::builder()
         .cookie_provider(cookie_db.clone())
         .build()?;
-    let mut memberships = Err(Error::from("No memberships"));
+    let mut memberships = Err(Error::msg("No memberships"));
     if let Ok(cookie) = cookie_db.get_cookie_value(&config.members_url) {
         log::info!("Trying saved cookie: {}", cookie);
         memberships = scrape_memberships(&config, &client).await;
@@ -30,7 +30,7 @@ pub(crate) async fn init(config: Config) -> Result<(), Error> {
     }
     if let Err(err) = memberships {
         log::error!("{}", err);
-        return Err(Error::from(
+        return Err(anyhow!(
             "Failed to scrape members with known cookies, try obtaining another one",
         ));
     }
@@ -115,15 +115,15 @@ async fn scrape_memberships(config: &Config, client: &Client) -> Result<Vec<Memb
     let response = client.execute(request).await?;
 
     if response.status() != StatusCode::OK {
-        return Err(Error::from(format!(
+        return Err(anyhow!(
             "Failed to scrape members, status code: {}",
             response.status()
-        )));
+        ));
     }
 
     let html = response.text().await?;
     if html.contains("Sorry you're not authenticated") {
-        return Err(Error::from(
+        return Err(anyhow!(
             "Failed to scrape members, cookie not providing authenticated access",
         ));
     }
@@ -135,8 +135,12 @@ async fn scrape_memberships(config: &Config, client: &Client) -> Result<Vec<Memb
     for tr in html.select(&sel_tr).map(|e| e.select(&sel_td)) {
         let data: Vec<Option<&str>> = tr.take(2).map(|td| td.text().next()).collect();
         memberships.push(Membership {
-            student_id: data[0].ok_or("Unexpected td value")?.parse()?,
-            name: data[1].ok_or("Unexpected td value")?.to_string(),
+            student_id: data[0]
+                .ok_or_else(|| anyhow!("Unexpected td value"))?
+                .parse()?,
+            name: data[1]
+                .ok_or_else(|| anyhow!("Unexpected td value"))?
+                .to_string(),
             discord_id: None,
             should_drop: false,
         });

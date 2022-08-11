@@ -1,4 +1,4 @@
-use crate::error::Error;
+use anyhow::Result;
 use poise::serenity_prelude::Http;
 use reqwest::Url;
 use rusqlite::Connection;
@@ -51,7 +51,7 @@ impl Config {
         file
     }
 
-    pub(crate) fn get_sqlite_conn(&self) -> Result<Connection, Error> {
+    pub(crate) fn get_sqlite_conn(&self) -> Result<Connection> {
         let file = self.get_sqlite_file();
         OpenOptions::new().create(true).write(true).open(&file)?;
         Ok(Connection::open(&file)?)

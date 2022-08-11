@@ -1,6 +1,6 @@
 use std::string::String;
 
-use crate::error::Error;
+use anyhow::Result;
 use fallible_iterator::FallibleIterator;
 use reqwest::cookie::CookieStore;
 use reqwest::header::HeaderValue;
@@ -12,7 +12,7 @@ pub struct CookieDatabase {
 }
 
 impl CookieDatabase {
-    pub fn init_table(conn: &Connection) -> Result<(), Error> {
+    pub fn init_table(conn: &Connection) -> Result<()> {
         conn.execute("CREATE TABLE IF NOT EXISTS cookies (url VARCHAR NOT NULL PRIMARY KEY, name VARCHAR NOT NULL, value VARCHAR NOT NULL)", params![])?;
         Ok(())
     }
@@ -21,7 +21,7 @@ impl CookieDatabase {
         Self { conn }
     }
 
-    pub fn add_cookie<T: Into<String>>(&self, url: &Url, key: T, value: T) -> Result<(), Error> {
+    pub fn add_cookie<T: Into<String>>(&self, url: &Url, key: T, value: T) -> Result<()> {
         self.conn.execute(
             "INSERT OR REPLACE INTO cookies (url, name, value) VALUES (?1, ?2, ?3)",
             params![url.to_string(), key.into(), value.into()],
@@ -29,7 +29,7 @@ impl CookieDatabase {
         Ok(())
     }
 
-    pub fn get_cookie_value(&self, url: &Url) -> Result<String, Error> {
+    pub fn get_cookie_value(&self, url: &Url) -> Result<String> {
         Ok(self.conn.query_row(
             "SELECT value FROM cookies WHERE url = ?1",
             params![url.to_string()],

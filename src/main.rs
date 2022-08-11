@@ -6,7 +6,6 @@ use tokio_schedule::Job;
 mod bot;
 mod config;
 mod cookie_database;
-mod error;
 mod membership;
 mod scraper;
 
