@@ -115,6 +115,12 @@ async fn register(
             &membership.name
         ))
         .await?;
+    } else {
+        log::info!(
+            "Registered user {} with id {}",
+            target_member.user.name,
+            membership.student_id
+        )
     }
     Ok(())
 }
