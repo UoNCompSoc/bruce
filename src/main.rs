@@ -33,7 +33,8 @@ async fn main() {
         .await
         .expect("initialize scraper");
     let bot = tokio::spawn(bot::build_framework(config.clone()).run());
-    while let Err(err) = tokio::spawn(tokio_schedule::every(2).hours().perform(scraper::run)).await
+    while let Err(err) =
+        tokio::spawn(tokio_schedule::every(30).minutes().perform(scraper::run)).await
     {
         log::error!("{}", err);
     }
