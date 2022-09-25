@@ -19,7 +19,9 @@ pub fn build_framework(config: Config) -> FrameworkBuilder<Config, Error> {
         })
         .token(&config.discord_token)
         .intents(
-            serenity::GatewayIntents::non_privileged() | serenity::GatewayIntents::MESSAGE_CONTENT,
+            serenity::GatewayIntents::non_privileged()
+                | serenity::GatewayIntents::MESSAGE_CONTENT
+                | serenity::GatewayIntents::GUILD_MEMBERS,
         )
         .user_data_setup(|_ctx, _ready, _framework| Box::pin(async { Ok(config) }))
 }
@@ -162,27 +164,52 @@ async fn prune(ctx: Context<'_>) -> Result<(), Error> {
             .await?;
         return Ok(());
     }
+
     let conn = ctx.data().get_sqlite_conn()?;
     let memberships: Vec<Membership> = Membership::get_all(&conn)?
         .into_iter()
-        .filter(|m| m.should_drop)
+        .filter(|m| m.discord_id.is_some())
         .collect();
-    ctx.say(format!("Dropping {} members", memberships.len()))
+    let users = ctx
+        .guild()
+        .ok_or_else(|| anyhow!("Failed to retrieve server information"))?
+        .members(ctx.data().get_http(), None, None)
         .await?;
-    for membership in memberships {
-        if let Some(discord_id) = membership.discord_id {
-            let mut member = ctx
-                .guild()
-                .ok_or_else(|| anyhow!("Failed to retrieve server information"))?
-                .member(ctx.data().get_http(), UserId::from(discord_id))
-                .await?;
+    let user_count = ctx
+        .guild()
+        .ok_or_else(|| anyhow!("Failed to retrieve server information"))?
+        .member_count as usize;
+
+    if users.len() != user_count {
+        return Err(anyhow!(
+            "Failed to retrieve all users; Expected: {}, Actual: {}",
+            user_count,
+            users.len()
+        ));
+    }
+
+    ctx.say(format!("Checking {} users", users.len())).await?;
+
+    let mut count = 0;
+    for mut member in users {
+        let membership = memberships
+            .iter()
+            .find(|m| m.discord_id.unwrap() == *member.user.id.as_u64());
+        if membership.is_none() || membership.unwrap().should_drop {
             member
                 .remove_role(ctx.data().get_http(), get_member_role(ctx)?)
                 .await?;
-            log::info!("Removing roles from {}", membership.student_id);
+            count += 1;
+            log::info!("Removing roles from {}", member.user.name);
         }
+    }
+
+    ctx.say(format!("Pruned {count} users")).await?;
+
+    for membership in memberships.into_iter().filter(|m| m.should_drop) {
         membership.delete(&conn)?;
     }
+
     Ok(())
 }
 
